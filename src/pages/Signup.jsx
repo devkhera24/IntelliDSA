@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/UI/Button'
 import { useAuth } from '../context/AuthContext'
 
 export default function Signup() {
-	const { signup } = useAuth()
+	const { user, signup } = useAuth()
 	const navigate = useNavigate()
 
 	const [displayName, setDisplayName] = useState('')
@@ -13,13 +13,19 @@ export default function Signup() {
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
 
+	useEffect(() => {
+		if (user) {
+			navigate('/dashboard', { replace: true })
+		}
+	}, [user, navigate])
+
 	async function handleSubmit(e) {
 		e.preventDefault()
 		setError('')
 		setLoading(true)
 		try {
 			await signup(email, pass, displayName)
-			navigate('/dashboard')
+			navigate('/dashboard', { replace: true })
 		} catch (err) {
 			setError('Could not create your account. Please try again.')
 		} finally {

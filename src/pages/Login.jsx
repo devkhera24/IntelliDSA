@@ -1,10 +1,10 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/UI/Button'
 import { useAuth } from '../context/AuthContext'
 
 export default function Login() {
-	const { login } = useAuth()
+	const { user, login } = useAuth()
 	const navigate = useNavigate()
 
 	const [email, setEmail] = useState('')
@@ -12,13 +12,19 @@ export default function Login() {
 	const [error, setError] = useState('')
 	const [loading, setLoading] = useState(false)
 
+	useEffect(() => {
+		if (user) {
+			navigate('/dashboard', { replace: true })
+		}
+	}, [user, navigate])
+
 	async function handleSubmit(e) {
 		e.preventDefault()
 		setError('')
 		setLoading(true)
 		try {
 			await login(email, pass)
-			navigate('/dashboard')
+			navigate('/dashboard', { replace: true })
 		} catch (err) {
 			setError('Invalid email or password.')
 		} finally {
