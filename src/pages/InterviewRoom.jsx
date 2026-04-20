@@ -19,9 +19,21 @@ export default function InterviewRoom() {
 	const { user } = useAuth()
 	const navigate = useNavigate()
 
+	const LANGUAGE_OPTIONS = [
+		{ value: 'javascript', label: 'JavaScript' },
+		{ value: 'typescript', label: 'TypeScript' },
+		{ value: 'python', label: 'Python' },
+		{ value: 'java', label: 'Java' },
+		{ value: 'cpp', label: 'C++' },
+		{ value: 'c', label: 'C' },
+		{ value: 'go', label: 'Go' },
+		{ value: 'csharp', label: 'C#' },
+	]
+
 	const [problem, setProblem] = useState(null)
 	const [code, setCode] = useState('')
 	const [scratchpad, setScratchpad] = useState('')
+	const [language, setLanguage] = useState('javascript')
 	const [sessionId, setSessionId] = useState(null)
 	const [sessionStarted, setSessionStarted] = useState(false)
 	const [submitting, setSubmitting] = useState(false)
@@ -172,8 +184,8 @@ export default function InterviewRoom() {
 				</div>
 			</header>
 
-			<div className="flex flex-1 overflow-hidden">
-				<div className="w-[28%] bg-slate-900 border-r border-slate-800 overflow-y-auto p-5 shrink-0">
+			<div className="flex flex-1 overflow-hidden min-h-0">
+				<div className="w-[28%] bg-slate-900 border-r border-slate-800 overflow-y-auto p-5 shrink-0 min-h-0">
 					<div className="flex flex-wrap gap-2 mb-4">
 						<span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded">
 							{problem.category}
@@ -205,26 +217,50 @@ export default function InterviewRoom() {
 					)}
 				</div>
 
-				<div className="flex-1 flex overflow-hidden">
-					<div className="w-10 bg-slate-950 border-r border-slate-800 shrink-0">
+				<div className="flex-1 flex overflow-hidden min-w-0 min-h-0">
+					<div className="w-10 bg-slate-950 border-r border-slate-800 shrink-0 min-h-0">
 						<KeystrokeHeatmap heatmapData={heatmapData} totalLines={40} />
 					</div>
 
-					<div className="flex-1 flex flex-col overflow-hidden">
-						<div className="flex-[3] border-b border-slate-800 overflow-hidden">
+					<div className="flex-1 flex flex-col overflow-hidden min-w-0 min-h-0">
+						<div className="shrink-0 px-3 py-2 bg-slate-900 border-b border-slate-800 flex items-center justify-between gap-3">
+							<div className="text-xs text-slate-400 font-medium tracking-wide uppercase">Code Editor</div>
+							<label className="flex items-center gap-2 text-xs text-slate-400">
+								<span className="text-slate-500">Language</span>
+								<select
+									value={language}
+									onChange={(e) => setLanguage(e.target.value)}
+									className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-slate-200 focus:outline-none"
+								>
+									{LANGUAGE_OPTIONS.map((opt) => (
+										<option key={opt.value} value={opt.value}>
+											{opt.label}
+										</option>
+									))}
+								</select>
+							</label>
+						</div>
+						<div className="flex-[3] overflow-hidden min-h-0">
 							<CodeEditor
 								value={code}
 								onChange={(val) => setCode(val || '')}
 								onCursorChange={handleCursorChange}
+								language={language}
 							/>
 						</div>
-						<div className="flex-1 overflow-hidden">
-							<Scratchpad value={scratchpad} onChange={setScratchpad} />
+						<div className="flex-1 overflow-hidden min-h-0">
+							<Scratchpad
+								value={scratchpad}
+								onChange={setScratchpad}
+								language={language}
+								onLanguageChange={setLanguage}
+								languageOptions={LANGUAGE_OPTIONS}
+							/>
 						</div>
 					</div>
 				</div>
 
-				<div className="w-64 bg-slate-900 border-l border-slate-800 shrink-0 overflow-hidden">
+				<div className="w-64 bg-slate-900 border-l border-slate-800 shrink-0 overflow-hidden min-h-0">
 					<NudgeSidebar nudges={nudges} isAnalyzing={isAnalyzing} />
 				</div>
 			</div>
