@@ -6,9 +6,5 @@ export default function LoadingSpinner({ fullPage = false }) {
 			</div>
 		)
 	}
-	return (
-		<div className="flex items-center justify-center p-4">
-			<div className="w-6 h-6 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
-		</div>
-	)
+	return <div className="w-6 h-6 border-4 border-brand-500 border-t-transparent rounded-full animate-spin" />
 }

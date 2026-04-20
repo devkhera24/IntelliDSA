@@ -1,44 +1,231 @@
+import { useEffect, useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import CodeEditor from '../components/Editor/CodeEditor'
+import KeystrokeHeatmap from '../components/Editor/KeystrokeHeatmap'
+import Scratchpad from '../components/Editor/Scratchpad'
+import Timer from '../components/Editor/Timer'
+import NudgeSidebar from '../components/Feedback/NudgeSidebar'
+import LoadingSpinner from '../components/UI/LoadingSpinner'
+import { useAuth } from '../context/AuthContext'
+import { useKeystrokeTracker } from '../hooks/useKeystrokeTracker'
+import { useLiveMonitor } from '../hooks/useLiveMonitor'
+import { useSession } from '../hooks/useSession'
+import { useTimer } from '../hooks/useTimer'
+import { generatePostmortem } from '../services/aiService'
+import { getProblem, updatePatterns, updateUserStats } from '../services/firestoreService'
+
 export default function InterviewRoom() {
+	const { problemId } = useParams()
+	const { user } = useAuth()
+	const navigate = useNavigate()
+
+	const [problem, setProblem] = useState(null)
+	const [code, setCode] = useState('')
+	const [scratchpad, setScratchpad] = useState('')
+	const [sessionId, setSessionId] = useState(null)
+	const [sessionStarted, setSessionStarted] = useState(false)
+	const [submitting, setSubmitting] = useState(false)
+	const [loadingProblem, setLoadingProblem] = useState(true)
+
+	const timer = useTimer(problem?.timeLimit || 0)
+	const { recordKeystroke, getHeatmapData, getEvents } = useKeystrokeTracker()
+	const [heatmapData, setHeatmapData] = useState({})
+
+	const { nudges, isAnalyzing } = useLiveMonitor({
+		problem,
+		code,
+		scratchpad,
+		elapsedSeconds: timer.elapsed,
+		isActive: sessionStarted && !timer.isExpired,
+	})
+
+	const { startSession, submitSession } = useSession()
+
+	useEffect(() => {
+		async function load() {
+			const p = await getProblem(problemId)
+			if (!p) {
+				navigate('/practice')
+				return
+			}
+			setProblem(p)
+			setCode(p.starterCode || '')
+			setLoadingProblem(false)
+		}
+		load()
+	}, [problemId, navigate])
+
+	useEffect(() => {
+		const interval = setInterval(() => {
+			setHeatmapData(getHeatmapData())
+		}, 3000)
+		return () => clearInterval(interval)
+	}, [getHeatmapData])
+
+	async function handleStart() {
+		const id = await startSession(user.uid, problemId)
+		if (!id) return
+		setSessionId(id)
+		setSessionStarted(true)
+		timer.start()
+	}
+
+	async function handleSubmit() {
+		if (submitting) return
+		setSubmitting(true)
+		timer.pause()
+
+		try {
+			const postmortem = await generatePostmortem({
+				problem,
+				code,
+				scratchpad,
+				durationSeconds: timer.elapsed,
+				nudges,
+			})
+
+			if (!postmortem || !sessionId) {
+				setSubmitting(false)
+				timer.start()
+				return
+			}
+
+			await submitSession(sessionId, {
+				userId: user.uid,
+				problemId,
+				finalCode: code,
+				scratchpadContent: scratchpad,
+				nudges,
+				keystrokeEvents: getEvents(),
+				postmortem,
+			})
+			await updatePatterns(user.uid, postmortem, problem.category)
+			await updateUserStats(user.uid, postmortem.overallScore)
+			navigate(`/review/${sessionId}`)
+		} catch (err) {
+			console.error('Submit error:', err)
+			setSubmitting(false)
+			timer.start()
+		}
+	}
+
+	function handleCursorChange(line, col) {
+		recordKeystroke(line, col)
+	}
+
+	if (loadingProblem) return <LoadingSpinner fullPage />
+
 	return (
-		<div className="min-h-screen bg-slate-950 text-slate-100 px-6 py-10">
-			<div className="mx-auto max-w-6xl">
-				<div className="flex items-start justify-between gap-6 flex-wrap">
-					<div>
-						<h1 className="text-2xl font-semibold">Interview Room</h1>
-						<p className="mt-1 text-sm text-slate-400">
-							Monaco editor + timer + nudges + heatmap will be wired later.
-						</p>
+		<div className="flex flex-col h-screen bg-slate-950 overflow-hidden">
+			<header className="flex items-center justify-between px-4 py-3 bg-slate-900 border-b border-slate-800 shrink-0">
+				<div className="flex items-center gap-4">
+					<button
+						onClick={() => navigate('/practice')}
+						className="text-slate-400 hover:text-white text-sm transition"
+					>
+						← Back
+					</button>
+					<h1 className="text-white font-semibold text-sm">{problem.title}</h1>
+					<span
+						className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+							problem.difficulty === 'easy'
+								? 'bg-green-900/50 text-green-400'
+								: problem.difficulty === 'medium'
+									? 'bg-yellow-900/50 text-yellow-400'
+									: 'bg-red-900/50 text-red-400'
+						}`}
+					>
+						{problem.difficulty}
+					</span>
+				</div>
+
+				<div className="flex items-center gap-4">
+					<Timer
+						minutes={timer.minutes}
+						seconds={timer.seconds}
+						urgency={timer.urgency}
+						isRunning={timer.isRunning}
+					/>
+					{!sessionStarted ? (
+						<button
+							onClick={handleStart}
+							className="bg-green-500 hover:bg-green-400 text-slate-900 font-semibold px-4 py-2 rounded-lg text-sm transition"
+						>
+							Start Interview
+						</button>
+					) : (
+						<button
+							onClick={handleSubmit}
+							disabled={submitting}
+							className="bg-blue-600 hover:bg-blue-500 disabled:opacity-50 text-white font-semibold px-4 py-2 rounded-lg text-sm transition flex items-center gap-2"
+						>
+							{submitting ? (
+								<>
+									<LoadingSpinner />
+									Analyzing…
+								</>
+							) : (
+								'Submit Solution'
+							)}
+						</button>
+					)}
+				</div>
+			</header>
+
+			<div className="flex flex-1 overflow-hidden">
+				<div className="w-[28%] bg-slate-900 border-r border-slate-800 overflow-y-auto p-5 shrink-0">
+					<div className="flex flex-wrap gap-2 mb-4">
+						<span className="text-xs bg-slate-800 text-slate-300 px-2 py-1 rounded">
+							{problem.category}
+						</span>
+						{problem.companies.slice(0, 3).map((c) => (
+							<span key={c} className="text-xs bg-slate-800 text-slate-400 px-2 py-1 rounded">
+								{c}
+							</span>
+						))}
 					</div>
-					<div className="flex items-center gap-2">
-						<div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2 text-sm text-slate-300">
-							Timer: <span className="text-slate-100 font-medium">—</span>
+					<pre className="text-slate-300 text-sm whitespace-pre-wrap leading-relaxed font-sans">
+						{problem.prompt}
+					</pre>
+
+					{sessionStarted && (
+						<div className="mt-6 pt-4 border-t border-slate-800">
+							<p className="text-xs text-slate-500 font-semibold uppercase tracking-wide mb-2">
+								Hints
+							</p>
+							<ul className="space-y-1">
+								{problem.hints.map((h, i) => (
+									<li key={i} className="text-xs text-slate-400 flex gap-2">
+										<span className="text-slate-600">{i + 1}.</span>
+										<span>{h}</span>
+									</li>
+								))}
+							</ul>
 						</div>
-						<div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2 text-sm text-slate-300">
-							Nudges: <span className="text-slate-100 font-medium">off</span>
+					)}
+				</div>
+
+				<div className="flex-1 flex overflow-hidden">
+					<div className="w-10 bg-slate-950 border-r border-slate-800 shrink-0">
+						<KeystrokeHeatmap heatmapData={heatmapData} totalLines={40} />
+					</div>
+
+					<div className="flex-1 flex flex-col overflow-hidden">
+						<div className="flex-[3] border-b border-slate-800 overflow-hidden">
+							<CodeEditor
+								value={code}
+								onChange={(val) => setCode(val || '')}
+								onCursorChange={handleCursorChange}
+							/>
+						</div>
+						<div className="flex-1 overflow-hidden">
+							<Scratchpad value={scratchpad} onChange={setScratchpad} />
 						</div>
 					</div>
 				</div>
 
-				<div className="mt-8 grid gap-4 lg:grid-cols-3">
-					<div className="lg:col-span-2 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-						<div className="flex items-center justify-between">
-							<h2 className="text-sm font-semibold text-slate-200">Editor</h2>
-							<div className="h-8 w-28 rounded-lg bg-slate-800" />
-						</div>
-						<div className="mt-4 h-[360px] rounded-xl bg-slate-950/40 border border-slate-800" />
-					</div>
-					<div className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-						<h2 className="text-sm font-semibold text-slate-200">Live feedback</h2>
-						<div className="mt-4 space-y-3">
-							{Array.from({ length: 4 }).map((_, idx) => (
-								<div key={idx} className="rounded-xl border border-slate-800 bg-slate-950/30 p-4">
-									<div className="h-2.5 w-20 rounded bg-slate-800" />
-									<div className="mt-3 h-2.5 w-full rounded bg-slate-800" />
-									<div className="mt-2 h-2.5 w-2/3 rounded bg-slate-800" />
-								</div>
-							))}
-						</div>
-					</div>
+				<div className="w-64 bg-slate-900 border-l border-slate-800 shrink-0 overflow-hidden">
+					<NudgeSidebar nudges={nudges} isAnalyzing={isAnalyzing} />
 				</div>
 			</div>
 		</div>

@@ -7,6 +7,12 @@ export function useTimer(initialSeconds) {
 	const intervalRef = useRef(null)
 
 	useEffect(() => {
+		setIsRunning(false)
+		setTimeLeft(initialSeconds)
+		setElapsed(0)
+	}, [initialSeconds])
+
+	useEffect(() => {
 		if (isRunning) {
 			intervalRef.current = setInterval(() => {
 				setTimeLeft((t) => {
