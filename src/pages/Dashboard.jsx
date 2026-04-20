@@ -1,101 +1,138 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import Button from '../components/UI/Button'
+import SessionCard from '../components/Dashboard/SessionCard'
+import StatsBar from '../components/Dashboard/StatsBar'
+import LoadingSpinner from '../components/UI/LoadingSpinner'
 import { useAuth } from '../context/AuthContext'
-import { seedProblems } from '../services/firestoreService'
+import { deleteSession, getPatterns, getUserSessions, seedProblems } from '../services/firestoreService'
+import { getTopWeaknesses } from '../utils/scoreAggregator'
 
 export default function Dashboard() {
 	const { user, logout } = useAuth()
 	const navigate = useNavigate()
+	const [sessions, setSessions] = useState([])
+	const [patterns, setPatterns] = useState(null)
+	const [loading, setLoading] = useState(true)
 	const [seeding, setSeeding] = useState(false)
 	const [seeded, setSeeded] = useState(false)
+
+	useEffect(() => {
+		async function load() {
+			const [s, p] = await Promise.all([getUserSessions(user.uid), getPatterns(user.uid)])
+			setSessions(s)
+			setPatterns(p)
+			setLoading(false)
+		}
+		load()
+	}, [user.uid])
+
+	async function handleDelete(sessionId) {
+		await deleteSession(sessionId)
+		setSessions((prev) => prev.filter((s) => s.id !== sessionId))
+	}
+
+	async function handleSeed() {
+		setSeeding(true)
+		await seedProblems()
+		setSeeding(false)
+		setSeeded(true)
+	}
 
 	async function handleLogout() {
 		await logout()
 		navigate('/')
 	}
 
-	async function handleSeed() {
-		setSeeding(true)
-		try {
-			await seedProblems()
-			setSeeded(true)
-		} finally {
-			setSeeding(false)
-		}
-	}
+	const topWeakness = useMemo(() => {
+		if (!patterns?.weaknessFrequency) return null
+		const top = getTopWeaknesses(patterns.weaknessFrequency, 1)
+		return top[0]?.weakness || null
+	}, [patterns])
+
+	if (loading) return <LoadingSpinner fullPage />
 
 	return (
-		<div className="min-h-screen bg-slate-950 text-slate-100 px-6 py-10">
-			<div className="mx-auto max-w-6xl">
-				<div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
+		<div className="min-h-screen bg-slate-950 text-white">
+			{/* Nav */}
+			<nav className="flex items-center justify-between px-8 py-4 bg-slate-900 border-b border-slate-800">
+				<span className="text-green-400 font-bold text-lg">MockMate</span>
+				<div className="flex items-center gap-4">
+					<Link to="/patterns" className="text-slate-400 hover:text-white text-sm transition">
+						Patterns
+					</Link>
+					<Link
+						to="/practice"
+						className="bg-green-500 text-slate-900 font-semibold px-4 py-2 rounded-lg hover:bg-green-400 transition text-sm"
+					>
+						Practice →
+					</Link>
+					<button
+						onClick={handleLogout}
+						className="text-slate-400 hover:text-red-400 text-sm transition"
+					>
+						Logout
+					</button>
+				</div>
+			</nav>
+
+			<main className="max-w-4xl mx-auto px-6 py-10">
+				<div className="flex items-center justify-between mb-8">
 					<div>
-						<div className="text-xs text-slate-500">Signed in as</div>
-						<div className="text-sm text-slate-200">
-							{user?.displayName || 'Anonymous'}
-							<span className="text-slate-500"> · </span>
-							<span className="text-slate-400">{user?.email}</span>
-						</div>
+						<h1 className="text-2xl font-bold">
+							Welcome back, {user.displayName?.split(' ')[0] || 'coder'}
+						</h1>
+						<p className="text-slate-400 text-sm mt-1">Here's your interview performance summary</p>
 					</div>
-					<div className="flex items-center gap-2">
-						<Button as={Link} to="/practice" variant="secondary" size="sm">
-							Practice
-						</Button>
-						<Button as={Link} to="/patterns" variant="secondary" size="sm">
-							Patterns
-						</Button>
-						<Button onClick={handleLogout} variant="ghost" size="sm">
-							Log out
-						</Button>
-					</div>
+					{/* One-time seed button — remove after first seed */}
+					{!seeded && (
+						<button
+							onClick={handleSeed}
+							disabled={seeding}
+							className="text-xs bg-slate-800 border border-slate-600 text-slate-400 px-3 py-2 rounded-lg hover:border-green-500 hover:text-green-400 transition"
+						>
+							{seeding ? 'Seeding…' : '⚙️ Seed Problems (run once)'}
+						</button>
+					)}
 				</div>
 
-				<div className="flex items-start justify-between gap-6 flex-wrap">
-					<div>
-						<h1 className="text-2xl font-semibold">Dashboard</h1>
-						<p className="mt-1 text-sm text-slate-400">
-							Protected route stub; real data appears in later steps.
-						</p>
-					</div>
-					<div className="flex items-center gap-2">
-						<div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2 text-sm text-slate-300">
-							Sessions: <span className="text-slate-100 font-medium">0</span>
-						</div>
-						<div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-2 text-sm text-slate-300">
-							Avg score: <span className="text-slate-100 font-medium">—</span>
-						</div>
-					</div>
-				</div>
+				<StatsBar
+					totalSessions={sessions.length}
+					avgScore={
+						patterns
+							? Object.values(patterns.categoryScores || {}).reduce((a, b) => a + b, 0) /
+								(Object.keys(patterns.categoryScores || {}).length || 1)
+							: null
+					}
+					topWeakness={topWeakness}
+				/>
 
-				<div className="mt-8 grid gap-4 md:grid-cols-3">
-					{['Recent sessions', 'Recommended problems', 'Your patterns'].map((title) => (
-						<div key={title} className="rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-							<h2 className="text-sm font-semibold text-slate-200">{title}</h2>
-							<p className="mt-2 text-sm text-slate-400">Coming in later steps.</p>
-						</div>
-					))}
-				</div>
-
-				{import.meta.env.DEV && (
-					<div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
-						<div className="flex items-center justify-between gap-4 flex-wrap">
-							<div>
-								<h2 className="text-sm font-semibold text-slate-200">Developer tools</h2>
-								<p className="mt-2 text-sm text-slate-400">
-									One-time setup: seed the 20 problems into Firestore.
-								</p>
-							</div>
-							{!seeded ? (
-								<Button onClick={handleSeed} disabled={seeding} variant="secondary" size="sm">
-									{seeding ? 'Seeding…' : 'Seed Problems (run once)'}
-								</Button>
-							) : (
-								<div className="text-sm text-brand-500">Seeded.</div>
-							)}
-						</div>
+				<div className="mt-10">
+					<div className="flex items-center justify-between mb-4">
+						<h2 className="text-lg font-semibold">Recent Sessions</h2>
+						<Link to="/practice" className="text-green-400 text-sm hover:underline">
+							+ New Session
+						</Link>
 					</div>
-				)}
-			</div>
+					{sessions.length === 0 ? (
+						<div className="bg-slate-900 border border-slate-800 rounded-xl p-10 text-center text-slate-500">
+							<p className="text-4xl mb-3">🎯</p>
+							<p>No sessions yet. Start your first mock interview!</p>
+							<Link
+								to="/practice"
+								className="mt-4 inline-block bg-green-500 text-slate-900 font-semibold px-6 py-2 rounded-lg text-sm hover:bg-green-400 transition"
+							>
+								Browse Problems
+							</Link>
+						</div>
+					) : (
+						<div className="flex flex-col gap-3">
+							{sessions.slice(0, 10).map((s) => (
+								<SessionCard key={s.id} session={s} problemTitle={s.problemId} onDelete={handleDelete} />
+							))}
+						</div>
+					)}
+				</div>
+			</main>
 		</div>
 	)
 }
