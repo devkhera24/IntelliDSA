@@ -1,5 +1,5 @@
 import { lazy, Suspense } from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Link, Routes, Route } from 'react-router-dom'
 import ProtectedRoute from './components/UI/ProtectedRoute'
 import LoadingSpinner from './components/UI/LoadingSpinner'
 
@@ -61,6 +61,19 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
+    <Route
+      path="*"
+      element={
+        <div className="min-h-screen bg-slate-950 flex items-center justify-center text-white flex-col gap-4">
+          <p className="text-6xl">404</p>
+          <p className="text-slate-400">Page not found</p>
+          <Link to="/" className="text-green-400 hover:underline">
+            Go home
+          </Link>
+        </div>
+      }
+    />
       </Routes>
     </Suspense>
   )

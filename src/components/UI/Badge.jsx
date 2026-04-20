@@ -1,14 +1,23 @@
-export default function Badge({ children, className = '' }) {
+const styles = {
+	easy: 'bg-green-900/50 text-green-400',
+	medium: 'bg-yellow-900/50 text-yellow-400',
+	hard: 'bg-red-900/50 text-red-400',
+	default: 'bg-slate-800 text-slate-300',
+}
+
+export default function Badge({ label, children, variant = 'default', className = '' }) {
+	const content = label ?? children
 	return (
 		<span
 			className={[
-				'inline-flex items-center rounded-full border border-slate-700 bg-slate-800/60 px-2.5 py-1 text-xs font-medium text-slate-200',
+				'text-xs px-2 py-0.5 rounded-full font-medium',
+				styles[variant] || styles.default,
 				className,
 			]
 				.filter(Boolean)
 				.join(' ')}
 		>
-			{children}
+			{content}
 		</span>
 	)
 }
