@@ -24,6 +24,8 @@ export default function CodeEditor({ value, onChange, onCursorChange, language =
 				wordWrap: 'on',
 				lineNumbers: 'on',
 				padding: { top: 12, bottom: 12 },
+				fontFamily: "'Fira Code', 'Cascadia Code', monospace",
+				fontLigatures: true,
 				renderLineHighlight: 'line',
 				smoothScrolling: true,
 			}}
