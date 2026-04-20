@@ -14,6 +14,165 @@ import { useTimer } from '../hooks/useTimer'
 import { generatePostmortem } from '../services/aiService'
 import { getProblem, updatePatterns, updateUserStats } from '../services/firestoreService'
 
+function toIdentifier(raw, fallback) {
+	const match = String(raw || '')
+		.trim()
+		.match(/[A-Za-z_][A-Za-z0-9_]*/)
+	return match ? match[0] : fallback
+}
+
+function capFirst(s) {
+	if (!s) return s
+	return s.charAt(0).toUpperCase() + s.slice(1)
+}
+
+function extractJsFunctionSignature(starterCode) {
+	const match = String(starterCode || '').match(/function\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)/)
+	if (!match) return null
+	const name = match[1]
+	const params = match[2]
+		.split(',')
+		.map((p) => p.trim())
+		.filter(Boolean)
+		.map((p, i) => toIdentifier(p, `arg${i + 1}`))
+	return { name, params }
+}
+
+function extractJsClassSignature(starterCode) {
+	const text = String(starterCode || '')
+	const classMatch = text.match(/class\s+([A-Za-z_][A-Za-z0-9_]*)/)
+	if (!classMatch) return null
+
+	const className = classMatch[1]
+	const methods = []
+	for (const line of text.split('\n')) {
+		const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*\(([^)]*)\)\s*\{/) // JS class method
+		if (!m) continue
+		const methodName = m[1]
+		const params = m[2]
+			.split(',')
+			.map((p) => p.trim())
+			.filter(Boolean)
+			.map((p, i) => toIdentifier(p, `arg${i + 1}`))
+		methods.push({ name: methodName, params })
+	}
+
+	const seen = new Set()
+	const unique = methods.filter((m) => {
+		if (seen.has(m.name)) return false
+		seen.add(m.name)
+		return true
+	})
+
+	return { className, methods: unique }
+}
+
+function getBoilerplateForLanguage({ starterCode, language, title }) {
+	const jsStarter = String(starterCode || '').trim()
+	if (language === 'javascript' || language === 'typescript') {
+		return jsStarter || `// ${title || 'Start coding'}\n`
+	}
+
+	const fn = extractJsFunctionSignature(jsStarter)
+	if (fn) {
+		if (language === 'python') {
+			return `def ${fn.name}(${fn.params.join(', ')}):\n    # TODO\n    pass\n`
+		}
+		if (language === 'java') {
+			return `class Solution {\n    public Object ${fn.name}(${fn.params
+				.map((p) => `Object ${p}`)
+				.join(', ')}) {\n        // TODO\n        return null;\n    }\n}\n`
+		}
+		if (language === 'csharp') {
+			return `public class Solution {\n    public object ${capFirst(fn.name)}(${fn.params
+				.map((p) => `object ${p}`)
+				.join(', ')}) {\n        // TODO\n        return null;\n    }\n}\n`
+		}
+		if (language === 'go') {
+			return `package main\n\nfunc ${capFirst(fn.name)}(${fn.params
+				.map((p) => `${p} any`)
+				.join(', ')}) any {\n    // TODO\n    return nil\n}\n`
+		}
+		if (language === 'cpp') {
+			return `class Solution {\npublic:\n    /* return type */ auto ${fn.name}(${fn.params
+				.map((p) => `/* type */ ${p}`)
+				.join(', ')}) {\n        // TODO\n    }\n};\n`
+		}
+		if (language === 'c') {
+			return `/* TODO: fill in proper types */\nvoid ${fn.name}(${fn.params
+				.map((p) => `/* type */ ${p}`)
+				.join(', ')}) {\n    // TODO\n}\n`
+		}
+		return `// ${title || 'Start coding'}\n`
+	}
+
+	const cls = extractJsClassSignature(jsStarter)
+	if (cls) {
+		if (language === 'python') {
+			const lines = [`class ${cls.className}:`]
+			const ctor = cls.methods.find((m) => m.name === 'constructor')
+			if (ctor) {
+				lines.push(`    def __init__(self, ${ctor.params.join(', ')}):`)
+				lines.push('        # TODO')
+				lines.push('        pass\n')
+			} else {
+				lines.push('    def __init__(self):')
+				lines.push('        # TODO')
+				lines.push('        pass\n')
+			}
+
+			for (const m of cls.methods) {
+				if (m.name === 'constructor') continue
+				lines.push(`    def ${m.name}(self${m.params.length ? `, ${m.params.join(', ')}` : ''}):`)
+				lines.push('        # TODO')
+				lines.push('        pass\n')
+			}
+			return lines.join('\n')
+		}
+
+		if (language === 'java') {
+			const lines = [`class ${cls.className} {`]
+			for (const m of cls.methods) {
+				if (m.name === 'constructor') {
+					lines.push(`    public ${cls.className}(${m.params.map((p) => `Object ${p}`).join(', ')}) {`)
+					lines.push('        // TODO')
+					lines.push('    }\n')
+					continue
+				}
+				lines.push(`    public Object ${m.name}(${m.params.map((p) => `Object ${p}`).join(', ')}) {`)
+				lines.push('        // TODO')
+				lines.push('        return null;')
+				lines.push('    }\n')
+			}
+			lines.push('}')
+			return lines.join('\n')
+		}
+
+		if (language === 'csharp') {
+			const lines = [`public class ${cls.className} {`]
+			for (const m of cls.methods) {
+				if (m.name === 'constructor') {
+					lines.push(`    public ${cls.className}(${m.params.map((p) => `object ${p}`).join(', ')}) {`)
+					lines.push('        // TODO')
+					lines.push('    }\n')
+					continue
+				}
+				lines.push(`    public object ${capFirst(m.name)}(${m.params.map((p) => `object ${p}`).join(', ')}) {`)
+				lines.push('        // TODO')
+				lines.push('        return null;')
+				lines.push('    }\n')
+			}
+			lines.push('}')
+			return lines.join('\n')
+		}
+
+		return `// Implement ${cls.className}\n`
+	}
+
+	if (language === 'python') return '# TODO\n'
+	return `// ${title || 'Start coding'}\n`
+}
+
 export default function InterviewRoom() {
 	const { problemId } = useParams()
 	const { user } = useAuth()
@@ -31,13 +190,15 @@ export default function InterviewRoom() {
 	]
 
 	const [problem, setProblem] = useState(null)
-	const [code, setCode] = useState('')
+	const [codeByLanguage, setCodeByLanguage] = useState({})
 	const [scratchpad, setScratchpad] = useState('')
 	const [language, setLanguage] = useState('javascript')
 	const [sessionId, setSessionId] = useState(null)
 	const [sessionStarted, setSessionStarted] = useState(false)
 	const [submitting, setSubmitting] = useState(false)
 	const [loadingProblem, setLoadingProblem] = useState(true)
+
+	const code = codeByLanguage[language] ?? ''
 
 	const timer = useTimer(problem?.timeLimit || 0)
 	const { recordKeystroke, getHeatmapData, getEvents } = useKeystrokeTracker()
@@ -61,11 +222,32 @@ export default function InterviewRoom() {
 				return
 			}
 			setProblem(p)
-			setCode(p.starterCode || '')
+			setCodeByLanguage({
+				javascript: p.starterCode || '',
+				typescript:
+					getBoilerplateForLanguage({ starterCode: p.starterCode, language: 'typescript', title: p.title }) ||
+					p.starterCode ||
+					'',
+			})
 			setLoadingProblem(false)
 		}
 		load()
 	}, [problemId, navigate])
+
+	function handleLanguageChange(nextLanguage) {
+		setCodeByLanguage((prev) => {
+			if (prev[nextLanguage] != null) return prev
+			return {
+				...prev,
+				[nextLanguage]: getBoilerplateForLanguage({
+					starterCode: problem?.starterCode,
+					language: nextLanguage,
+					title: problem?.title,
+				}),
+			}
+		})
+		setLanguage(nextLanguage)
+	}
 
 	useEffect(() => {
 		const interval = setInterval(() => {
@@ -92,6 +274,7 @@ export default function InterviewRoom() {
 				problem,
 				code,
 				scratchpad,
+				language,
 				durationSeconds: timer.elapsed,
 				nudges,
 			})
@@ -105,6 +288,7 @@ export default function InterviewRoom() {
 			await submitSession(sessionId, {
 				userId: user.uid,
 				problemId,
+				language,
 				finalCode: code,
 				scratchpadContent: scratchpad,
 				nudges,
@@ -229,7 +413,7 @@ export default function InterviewRoom() {
 								<span className="text-slate-500">Language</span>
 								<select
 									value={language}
-									onChange={(e) => setLanguage(e.target.value)}
+									onChange={(e) => handleLanguageChange(e.target.value)}
 									className="bg-slate-950 border border-slate-700 rounded-md px-2 py-1 text-slate-200 focus:outline-none"
 								>
 									{LANGUAGE_OPTIONS.map((opt) => (
@@ -243,7 +427,12 @@ export default function InterviewRoom() {
 						<div className="flex-[3] overflow-hidden min-h-0">
 							<CodeEditor
 								value={code}
-								onChange={(val) => setCode(val || '')}
+								onChange={(val) =>
+								setCodeByLanguage((prev) => ({
+									...prev,
+									[language]: val || '',
+								}))
+							}
 								onCursorChange={handleCursorChange}
 								language={language}
 							/>
@@ -253,7 +442,7 @@ export default function InterviewRoom() {
 								value={scratchpad}
 								onChange={setScratchpad}
 								language={language}
-								onLanguageChange={setLanguage}
+								onLanguageChange={handleLanguageChange}
 								languageOptions={LANGUAGE_OPTIONS}
 							/>
 						</div>
