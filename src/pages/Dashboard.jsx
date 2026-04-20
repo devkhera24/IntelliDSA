@@ -1,14 +1,28 @@
+import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/UI/Button'
 import { useAuth } from '../context/AuthContext'
+import { seedProblems } from '../services/firestoreService'
 
 export default function Dashboard() {
 	const { user, logout } = useAuth()
 	const navigate = useNavigate()
+	const [seeding, setSeeding] = useState(false)
+	const [seeded, setSeeded] = useState(false)
 
 	async function handleLogout() {
 		await logout()
 		navigate('/')
+	}
+
+	async function handleSeed() {
+		setSeeding(true)
+		try {
+			await seedProblems()
+			setSeeded(true)
+		} finally {
+			setSeeding(false)
+		}
 	}
 
 	return (
@@ -61,6 +75,26 @@ export default function Dashboard() {
 						</div>
 					))}
 				</div>
+
+				{import.meta.env.DEV && (
+					<div className="mt-8 rounded-2xl border border-slate-800 bg-slate-900/60 p-6">
+						<div className="flex items-center justify-between gap-4 flex-wrap">
+							<div>
+								<h2 className="text-sm font-semibold text-slate-200">Developer tools</h2>
+								<p className="mt-2 text-sm text-slate-400">
+									One-time setup: seed the 20 problems into Firestore.
+								</p>
+							</div>
+							{!seeded ? (
+								<Button onClick={handleSeed} disabled={seeding} variant="secondary" size="sm">
+									{seeding ? 'Seeding…' : 'Seed Problems (run once)'}
+								</Button>
+							) : (
+								<div className="text-sm text-brand-500">Seeded.</div>
+							)}
+						</div>
+					</div>
+				)}
 			</div>
 		</div>
 	)
