@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/UI/Button'
 import { useAuth } from '../context/AuthContext'
+import { getAuthErrorMessage } from '../utils/authErrors'
 
 export default function Login() {
 	const { user, login } = useAuth()
@@ -20,13 +21,23 @@ export default function Login() {
 
 	async function handleSubmit(e) {
 		e.preventDefault()
+		const trimmedEmail = email.trim()
+		if (!trimmedEmail) {
+			setError('Email is required.')
+			return
+		}
+		if (!pass) {
+			setError('Password is required.')
+			return
+		}
+
 		setError('')
 		setLoading(true)
 		try {
-			await login(email, pass)
+			await login(trimmedEmail, pass)
 			navigate('/dashboard', { replace: true })
 		} catch (err) {
-			setError('Invalid email or password.')
+			setError(getAuthErrorMessage(err, 'login'))
 		} finally {
 			setLoading(false)
 		}

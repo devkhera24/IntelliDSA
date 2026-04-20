@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import Button from '../components/UI/Button'
 import { useAuth } from '../context/AuthContext'
+import { getAuthErrorMessage } from '../utils/authErrors'
 
 export default function Signup() {
 	const { user, signup } = useAuth()
@@ -21,13 +22,33 @@ export default function Signup() {
 
 	async function handleSubmit(e) {
 		e.preventDefault()
+		const trimmedName = displayName.trim()
+		const trimmedEmail = email.trim()
+
+		if (!trimmedName) {
+			setError('Display name is required.')
+			return
+		}
+		if (!trimmedEmail) {
+			setError('Email is required.')
+			return
+		}
+		if (!pass) {
+			setError('Password is required.')
+			return
+		}
+		if (pass.length < 6) {
+			setError('Password must be at least 6 characters.')
+			return
+		}
+
 		setError('')
 		setLoading(true)
 		try {
-			await signup(email, pass, displayName)
+			await signup(trimmedEmail, pass, trimmedName)
 			navigate('/dashboard', { replace: true })
 		} catch (err) {
-			setError('Could not create your account. Please try again.')
+			setError(getAuthErrorMessage(err, 'signup'))
 		} finally {
 			setLoading(false)
 		}
