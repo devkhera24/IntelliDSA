@@ -1,7 +1,41 @@
+import { Link, useNavigate } from 'react-router-dom'
+import Button from '../components/UI/Button'
+import { useAuth } from '../context/AuthContext'
+
 export default function Dashboard() {
+	const { user, logout } = useAuth()
+	const navigate = useNavigate()
+
+	async function handleLogout() {
+		await logout()
+		navigate('/')
+	}
+
 	return (
 		<div className="min-h-screen bg-slate-950 text-slate-100 px-6 py-10">
 			<div className="mx-auto max-w-6xl">
+				<div className="mb-8 flex items-center justify-between gap-4 flex-wrap">
+					<div>
+						<div className="text-xs text-slate-500">Signed in as</div>
+						<div className="text-sm text-slate-200">
+							{user?.displayName || 'Anonymous'}
+							<span className="text-slate-500"> · </span>
+							<span className="text-slate-400">{user?.email}</span>
+						</div>
+					</div>
+					<div className="flex items-center gap-2">
+						<Button as={Link} to="/practice" variant="secondary" size="sm">
+							Practice
+						</Button>
+						<Button as={Link} to="/patterns" variant="secondary" size="sm">
+							Patterns
+						</Button>
+						<Button onClick={handleLogout} variant="ghost" size="sm">
+							Log out
+						</Button>
+					</div>
+				</div>
+
 				<div className="flex items-start justify-between gap-6 flex-wrap">
 					<div>
 						<h1 className="text-2xl font-semibold">Dashboard</h1>

@@ -1,8 +1,15 @@
 import { Link } from 'react-router-dom'
 import Badge from '../components/UI/Badge'
 import Button from '../components/UI/Button'
+import { useAuth } from '../context/AuthContext'
 
 export default function Landing() {
+	const { user, logout } = useAuth()
+
+	async function handleLogout() {
+		await logout()
+	}
+
 	return (
 		<div className="min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-slate-100">
 			<header className="sticky top-0 z-10 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur">
@@ -18,12 +25,25 @@ export default function Landing() {
 					</div>
 
 					<nav className="flex items-center gap-2">
-						<Button as={Link} to="/login" variant="ghost" size="sm">
-							Log in
-						</Button>
-						<Button as={Link} to="/signup" size="sm">
-							Create account
-						</Button>
+						{user ? (
+							<>
+								<Button as={Link} to="/dashboard" variant="secondary" size="sm">
+									Dashboard
+								</Button>
+								<Button onClick={handleLogout} variant="ghost" size="sm">
+									Log out
+								</Button>
+							</>
+						) : (
+							<>
+								<Button as={Link} to="/login" variant="ghost" size="sm">
+									Log in
+								</Button>
+								<Button as={Link} to="/signup" size="sm">
+									Create account
+								</Button>
+							</>
+						)}
 					</nav>
 				</div>
 			</header>
