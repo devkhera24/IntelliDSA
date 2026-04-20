@@ -6,7 +6,14 @@ async function postJson(url, payload) {
 	})
 
 	if (!res.ok) {
-		throw new Error(`Request failed: ${res.status}`)
+		let details = ''
+		try {
+			const data = await res.json()
+			details = data?.error ? `: ${data.error}` : ''
+		} catch {
+			// ignore
+		}
+		throw new Error(`Request failed: ${res.status}${details}`)
 	}
 
 	return res.json()
@@ -15,29 +22,25 @@ async function postJson(url, payload) {
 // ─── LIVE NUDGE ──────────────────────────────────────────
 // Called every ~15s during an active session
 export async function getNudge({ problem, code, scratchpad, elapsedSeconds, previousNudges = [] }) {
-	try {
-		const data = await postJson('/api/nudge', {
-			problem,
-			code,
-			scratchpad,
-			elapsedSeconds,
-			previousNudges,
-		})
-		return data?.nudge || null
-	} catch (err) {
-		console.error('getNudge error:', err)
-		return null
-	}
+	const data = await postJson('/api/nudge', {
+		problem,
+		code,
+		scratchpad,
+		elapsedSeconds,
+		previousNudges,
+	})
+	return data?.nudge || null
 }
 
 // ─── POSTMORTEM ───────────────────────────────────────────
 // Called once when user submits their solution
-export async function generatePostmortem({ problem, code, scratchpad, durationSeconds, nudges }) {
+export async function generatePostmortem({ problem, code, scratchpad, language, durationSeconds, nudges }) {
 	try {
 		const data = await postJson('/api/postmortem', {
 			problem,
 			code,
 			scratchpad,
+			language,
 			durationSeconds,
 			nudges,
 		})

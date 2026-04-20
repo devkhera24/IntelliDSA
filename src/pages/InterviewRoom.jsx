@@ -204,7 +204,7 @@ export default function InterviewRoom() {
 	const { recordKeystroke, getHeatmapData, getEvents } = useKeystrokeTracker()
 	const [heatmapData, setHeatmapData] = useState({})
 
-	const { nudges, isAnalyzing } = useLiveMonitor({
+	const { nudges, isAnalyzing, error } = useLiveMonitor({
 		problem,
 		code,
 		scratchpad,
@@ -450,7 +450,7 @@ export default function InterviewRoom() {
 				</div>
 
 				<div className="w-64 bg-slate-900 border-l border-slate-800 shrink-0 overflow-hidden min-h-0">
-					<NudgeSidebar nudges={nudges} isAnalyzing={isAnalyzing} />
+					<NudgeSidebar nudges={nudges} isAnalyzing={isAnalyzing} error={error} />
 				</div>
 			</div>
 		</div>

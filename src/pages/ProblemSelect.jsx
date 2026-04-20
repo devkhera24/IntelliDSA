@@ -50,8 +50,18 @@ export default function ProblemSelect() {
 	return (
 		<div className="min-h-screen bg-slate-950 text-white">
 			<div className="max-w-4xl mx-auto px-6 py-10">
-				<h1 className="text-2xl font-bold mb-2">Choose a Problem</h1>
-				<p className="text-slate-400 text-sm mb-8">{filtered.length} problems available</p>
+				<div className="flex items-start justify-between gap-4 mb-6 flex-wrap">
+					<div>
+						<button
+							onClick={() => navigate('/dashboard')}
+							className="text-slate-400 hover:text-white text-sm transition"
+						>
+							← Dashboard
+						</button>
+						<h1 className="text-2xl font-bold mt-3">Choose a Problem</h1>
+						<p className="text-slate-400 text-sm mt-2">{filtered.length} problems available</p>
+					</div>
+				</div>
 
 				<div className="flex flex-wrap gap-3 mb-8">
 					<Select

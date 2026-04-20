@@ -86,6 +86,6 @@ Return this exact JSON structure:
 		res.status(200).json({ postmortem: JSON.parse(raw) })
 	} catch (err) {
 		console.error('api/postmortem error:', err)
-		res.status(200).json({ postmortem: null })
+		res.status(500).json({ error: 'Postmortem generation failed' })
 	}
 }

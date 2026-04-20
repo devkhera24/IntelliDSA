@@ -90,6 +90,6 @@ Provide one nudge or null.`
 		res.status(200).json({ nudge: parsed })
 	} catch (err) {
 		console.error('api/nudge error:', err)
-		res.status(200).json({ nudge: null })
+		res.status(500).json({ error: 'Nudge generation failed' })
 	}
 }

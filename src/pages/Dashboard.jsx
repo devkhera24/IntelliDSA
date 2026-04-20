@@ -13,15 +13,23 @@ export default function Dashboard() {
 	const [sessions, setSessions] = useState([])
 	const [patterns, setPatterns] = useState(null)
 	const [loading, setLoading] = useState(true)
+	const [error, setError] = useState(null)
 	const [seeding, setSeeding] = useState(false)
 	const [seeded, setSeeded] = useState(false)
 
 	useEffect(() => {
 		async function load() {
-			const [s, p] = await Promise.all([getUserSessions(user.uid), getPatterns(user.uid)])
-			setSessions(s)
-			setPatterns(p)
-			setLoading(false)
+			setError(null)
+			try {
+				const [s, p] = await Promise.all([getUserSessions(user.uid), getPatterns(user.uid)])
+				setSessions(s)
+				setPatterns(p)
+			} catch (err) {
+				console.error('Dashboard load error:', err)
+				setError(err?.message || 'Failed to load dashboard data')
+			} finally {
+				setLoading(false)
+			}
 		}
 		load()
 	}, [user.uid])
@@ -76,6 +84,15 @@ export default function Dashboard() {
 			</nav>
 
 			<main className="max-w-4xl mx-auto px-6 py-10">
+				{error && (
+					<div className="mb-6 rounded-xl border border-red-900/60 bg-red-950/40 p-4 text-sm text-red-200">
+						<div className="font-semibold">Couldn't load dashboard data</div>
+						<div className="mt-1 text-red-200/80">{error}</div>
+						<div className="mt-3 text-red-200/70">
+							If this is Firestore permissions, re-check your rules for `sessions` + `patterns`.
+						</div>
+					</div>
+				)}
 				<div className="flex items-center justify-between mb-8">
 					<div>
 						<h1 className="text-2xl font-bold">
